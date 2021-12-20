@@ -1,12 +1,14 @@
 use anyhow::Error;
 use chrono::NaiveDate;
 use errors::Errors;
+use lazy_static::lazy_static;
 use regex::Regex;
 use serde::Deserialize;
 use serde_yaml;
-use std::fs::File;
+use std::fs::{read_dir, File};
+use std::io;
 use std::path::Path;
-use lazy_static::lazy_static;
+use std::prelude::*;
 
 mod errors;
 
@@ -49,7 +51,7 @@ struct Droplet {
     content: Option<String>,
 }
 
-lazy_static!{
+lazy_static! {
     // Unwrap these with certainty since the expressions themselves are constants (see above) and should compile just fine
     static ref EM_REGEX: Regex = Regex::new(EM_REGEX_STR).unwrap();
     static ref STRONG_REGEX: Regex = Regex::new(STRONG_REGEX_STR).unwrap();
@@ -68,17 +70,23 @@ impl Droplet {
             let mut attr_vec: Vec<String> = Vec::new();
             attr_vec.push(format!("src=\"{}\"", droplet_image.src.as_ref().display()));
             droplet_image.alt.as_ref().map(|alt| {
-                let cleaned = alt.trim().split('\n').fold("".to_string(), |mut acc, alt_line| {
-                    acc.push_str(alt_line);
-                    acc
-                });
+                let cleaned = alt
+                    .trim()
+                    .split('\n')
+                    .fold("".to_string(), |mut acc, alt_line| {
+                        acc.push_str(alt_line);
+                        acc
+                    });
 
                 attr_vec.push(format!("alt=\"{}\"", cleaned));
             });
 
-            Some(format!("<img {}/>\n", attr_vec.join(" ")))
+            Some(format!(
+                "<img class=\"spindrift-img\" {}/>\n",
+                attr_vec.join(" ")
+            ))
         } else {
-          None
+            None
         }
     }
 
@@ -101,24 +109,48 @@ impl Droplet {
                         .to_owned()
                         .to_string()
                 })
-                .map(|v| format!("<p>{}</p>", v))
+                .map(|v| format!("<p class=\"spindrift-text\">{}</p>", v))
                 .fold("".to_string(), |mut acc, paragraph| {
                     acc.push_str(&format!("{}\n", paragraph));
                     acc
                 })
         })
     }
+
+    fn file_name(&self) -> String {
+        format!("{}{}", self.title
+            .split_whitespace()
+            .map(|t| t.to_lowercase())
+            .collect::<Vec<String>>()
+            .join("-"), ".html".to_string())
+    }
 }
 
 fn main() -> Result<(), Error> {
-    let d = Droplet::from_file(Path::new("pages/test.yaml"))?;
+    match read_dir("pages") {
+        Err(why) => println!("! {:?}", why.kind()),
+        Ok(entries) => {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path_buff = entry.path();
+                    let path_obj = path_buff.as_path();
+                    println!("> {:?}", path_obj);
 
-    if let Some(image_src) = d.image_to_html() {
-        print!("{}", image_src);
-    }
-
-    if let Some(paragraph_html) = d.content_to_html() {
-        print!("{}", paragraph_html)
+                    if !path_obj.is_dir() {
+                        let d = Droplet::from_file(path_obj)?;
+                        println!("> as filename {}", d.file_name());
+                        if let Some(image_src) = d.image_to_html() {
+                            print!("{}", image_src)
+                        }
+                        if let Some(paragraph_html) = d.content_to_html() {
+                            print!("{}", paragraph_html)
+                        }
+                    } else {
+                        println!("> ignoring directory (for now) {:?}", path_obj)
+                    }
+                }
+            }
+        }
     }
 
     Ok(())
