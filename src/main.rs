@@ -1,155 +1,164 @@
 use anyhow::Error;
-use chrono::NaiveDate;
-use errors::Errors;
-use lazy_static::lazy_static;
-use regex::Regex;
-use serde::Deserialize;
-use serde_yaml;
 use std::fs::{read_dir, File};
-use std::io;
-use std::path::Path;
-use std::prelude::*;
+use std::path::PathBuf;
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread;
 
+use clap::Parser;
+
+use droplet::Droplet;
+use tera::Tera;
+
+mod droplet;
 mod errors;
 
-const EM_REGEX_STR: &str = r"_(?P<em_text>.*?)_";
-const STRONG_REGEX_STR: &str = r"\*\*(?P<strong_text>.*?)\*\*";
-const A_REGEX_STR: &str = r"\[(?P<a_text>.*?)\]\((?P<a_href>.*?)\)";
-
-#[derive(Debug, Deserialize)]
-/// Metadata for a Droplet
-struct DropletMeta {
-    /// An array of tags/keywords for this page
-    tags: Option<Vec<String>>,
-    /// The author of the post
-    author: String,
-    /// The date of the post
-    date: Option<NaiveDate>,
-}
-
-#[derive(Debug, Deserialize)]
-/// Image data for a Droplet
-struct DropletImage {
-    /// The path to the image relative to the directory in which the droplet .yaml exists
-    src: Box<Path>,
-    /// Alt text for accessibility
-    alt: Option<String>,
-    /// Copyright information
-    copyright: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-/// A Droplet is a single post or entry.
-struct Droplet {
-    /// Metadata for this post
-    meta: DropletMeta,
-    /// The title of the post
-    title: String,
-    /// Image content for the post
-    image: Option<DropletImage>,
-    /// Text content for the post
-    content: Option<String>,
-}
-
-lazy_static! {
-    // Unwrap these with certainty since the expressions themselves are constants (see above) and should compile just fine
-    static ref EM_REGEX: Regex = Regex::new(EM_REGEX_STR).unwrap();
-    static ref STRONG_REGEX: Regex = Regex::new(STRONG_REGEX_STR).unwrap();
-    static ref A_REGEX: Regex = Regex::new(A_REGEX_STR).unwrap();
-}
-
-impl Droplet {
-    fn from_file(path: &Path) -> Result<Droplet, Error> {
-        let droplet_file =
-            File::open(path).map_err(|e| Errors::InvalidDropletPath { source: e.into() })?;
-        Ok(serde_yaml::from_reader(droplet_file)?)
-    }
-
-    fn image_to_html(&self) -> Option<String> {
-        if let Some(droplet_image) = &self.image {
-            let mut attr_vec: Vec<String> = Vec::new();
-            attr_vec.push(format!("src=\"{}\"", droplet_image.src.as_ref().display()));
-            droplet_image.alt.as_ref().map(|alt| {
-                let cleaned = alt
-                    .trim()
-                    .split('\n')
-                    .fold("".to_string(), |mut acc, alt_line| {
-                        acc.push_str(alt_line);
-                        acc
-                    });
-
-                attr_vec.push(format!("alt=\"{}\"", cleaned));
-            });
-
-            Some(format!(
-                "<img class=\"spindrift-img\" {}/>\n",
-                attr_vec.join(" ")
-            ))
-        } else {
-            None
-        }
-    }
-
-    fn content_to_html(&self) -> Option<String> {
-        self.content.as_ref().map(|content| {
-            content
-                .trim()
-                .split('\n')
-                .map(|v| {
-                    let mut builder = EM_REGEX
-                        .replace_all(v, "<em>$em_text</em>")
-                        .to_owned()
-                        .to_string();
-                    builder = STRONG_REGEX
-                        .replace_all(&builder, "<strong>$strong_text</strong>")
-                        .to_owned()
-                        .to_string();
-                    A_REGEX
-                        .replace_all(&builder, "<a href=\"$a_href\">$a_text</a>")
-                        .to_owned()
-                        .to_string()
-                })
-                .map(|v| format!("<p class=\"spindrift-text\">{}</p>", v))
-                .fold("".to_string(), |mut acc, paragraph| {
-                    acc.push_str(&format!("{}\n", paragraph));
-                    acc
-                })
-        })
-    }
-
-    fn file_name(&self) -> String {
-        format!("{}{}", self.title
-            .split_whitespace()
-            .map(|t| t.to_lowercase())
-            .collect::<Vec<String>>()
-            .join("-"), ".html".to_string())
-    }
+#[derive(Debug, Parser)]
+#[clap(author, version, about)]
+struct Args {
+    #[clap(short, long, parse(from_os_str))]
+    /// The path to the directory containing the valid yaml droplets
+    source_dir: PathBuf,
+    #[clap(short, long, parse(from_os_str))]
+    /// The path where the rendered html should be written
+    out_dir: PathBuf,
+    #[clap(short, long, default_value = "templates")]
+    /// The directory containing valid tera templates
+    template_dir: String,
+    #[clap(short, long, default_values=&["yaml", "yml"])]
+    /// Supported file extensions for droplets, excluding the preceeding '.'
+    extensions: Vec<String>,
 }
 
 fn main() -> Result<(), Error> {
-    match read_dir("pages") {
+    let found_files = Arc::new(Mutex::new(0));
+
+    let mut ignored_files = 0;
+    let args = Args::parse();
+
+    let mut use_templates = args.template_dir.clone();
+    use_templates.push_str("/*.html");
+    println!("> using templates: {}", use_templates);
+    let templates: Arc<Mutex<Tera>> = {
+        let mut tera = match Tera::new(&use_templates) {
+            Ok(t) => t,
+            Err(e) => {
+                println!("! Failed to parse templates: {:?}", e);
+                ::std::process::exit(1);
+            }
+        };
+        tera.autoescape_on(vec![]);
+
+        Arc::new(Mutex::new(tera))
+    };
+
+    match read_dir(args.source_dir) {
         Err(why) => println!("! {:?}", why.kind()),
         Ok(entries) => {
+            let (tx, rx) = mpsc::channel();
+            let mut droplets: Vec<Droplet> = Vec::new();
+
             for entry in entries {
                 if let Ok(entry) = entry {
                     let path_buff = entry.path();
-                    let path_obj = path_buff.as_path();
-                    println!("> {:?}", path_obj);
+                    println!("> Found {:?}", path_buff);
 
-                    if !path_obj.is_dir() {
-                        let d = Droplet::from_file(path_obj)?;
-                        println!("> as filename {}", d.file_name());
-                        if let Some(image_src) = d.image_to_html() {
-                            print!("{}", image_src)
+                    if let Some(file_extension) = path_buff.extension() {
+                        if !args
+                            .extensions
+                            .contains(&file_extension.to_string_lossy().into_owned())
+                        {
+                            println!("> Ignoring {:?} - missing or bad file extension", path_buff);
+                            ignored_files += 1;
+                            continue;
                         }
-                        if let Some(paragraph_html) = d.content_to_html() {
-                            print!("{}", paragraph_html)
+                    }
+
+                    let (thread_ctr, thread_tx) = (Arc::clone(&found_files), tx.clone());
+                    thread::spawn(move || {
+                        println!(
+                            "({:?})> Starting processing {:?}",
+                            thread::current().id(),
+                            path_buff
+                        );
+
+                        if !path_buff.is_dir() {
+                            let mut ctr = thread_ctr.lock().unwrap();
+                            *ctr += 1;
+                            thread_tx
+                                .send(Droplet::from_file(path_buff.as_path()))
+                                .unwrap();
+                        } else {
+                            println!(
+                                "({:?})> {:?} -- ignoring directory (for now)",
+                                thread::current().id(),
+                                path_buff
+                            );
                         }
-                    } else {
-                        println!("> ignoring directory (for now) {:?}", path_obj)
+                    });
+                }
+            }
+            drop(tx);
+
+            let (out_tx, out_rx) = mpsc::channel();
+
+            for received in rx {
+                match received {
+                    Err(why) => {
+                        println!("! Thread hit error processing file: {:#?}", why);
+                    }
+                    Ok(droplet) => {
+                        println!("> Processed '{}' as {}", droplet.title, droplet.file_name());
+                        let (thread_out_dir, thread_tmpl, thread_out_tx) = (
+                            args.out_dir.join(droplet.file_name()),
+                            Arc::clone(&templates),
+                            out_tx.clone(),
+                        );
+                        thread::spawn(move || {
+                            println!("({:?})> Writing {} to output directory", thread::current().id(), droplet.file_name());
+                            let tmpl = thread_tmpl.lock().unwrap();
+                            match tmpl.render_to(
+                                "droplet.html",
+                                &(droplet.as_context()),
+                                File::create(thread_out_dir.clone()).unwrap(),
+                            ) {
+                                Ok(_) => {
+                                    println!("> Wrote '{}' to {:?}", droplet.title, thread_out_dir);
+                                    thread_out_tx.send(Ok(droplet)).unwrap();
+                                }
+                                Err(e) => {
+                                    thread_out_tx.send(Err(e)).unwrap();
+                                }
+                            };
+                        });
                     }
                 }
             }
+            drop(out_tx);
+
+            for res in out_rx {
+                match res {
+                    Err(why) => {
+                        println!("! Output thread hit error writing file: {:#?}", why);
+                    }
+                    Ok(droplet) => {
+                        droplets.push(droplet);
+                    }
+                }
+            }
+
+            let total_files: u32 = *(found_files.lock().unwrap());
+            drop(found_files);
+            println!(
+                "> Finished processing pages!\n\n\
+                  Ignored pages:\t\t\t\t{}\n\
+                  Failed pages:\t\t\t\t{}\n\
+                  Processed pages:\t\t\t{}\n\
+                  Total scanned (excl. directories):\t{}",
+                ignored_files,
+                total_files - droplets.len() as u32,
+                droplets.len(),
+                total_files + ignored_files,
+            );
         }
     }
 
