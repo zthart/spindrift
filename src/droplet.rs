@@ -31,9 +31,11 @@ pub(crate) struct DropletMeta {
     pub author: String,
     /// The date of the post
     pub date: Option<NaiveDate>,
+    /// A private member of the meta struct, where the derived path of the page is set
+    path: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 /// Image data for a Droplet
 pub(crate) struct DropletImage {
     /// The path to the image relative to the directory in which the droplet .yaml exists
@@ -44,7 +46,7 @@ pub(crate) struct DropletImage {
     copyright: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 /// A Droplet is a single post or entry.
 pub(crate) struct Droplet {
     /// Metadata for this post
@@ -55,6 +57,12 @@ pub(crate) struct Droplet {
     image: Option<DropletImage>,
     /// Text content for the post
     content: Option<String>,
+}
+
+impl DropletMeta {
+    fn set_path(&mut self, path: String) {
+        self.path = Some(path);
+    }
 }
 
 impl Droplet {
@@ -154,6 +162,10 @@ impl Droplet {
                 .join("-"),
             ".html".to_string()
         )
+    }
+
+    pub fn set_file_name(&mut self) {
+        self.meta.set_path(self.file_name());
     }
 
     pub fn as_context(&self) -> Context {
