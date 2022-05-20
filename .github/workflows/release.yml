@@ -15,16 +15,16 @@ jobs:
         id: generate-tag
         run: |
           echo "## Creating Tag" >> $GITHUB_STEP_SUMMARY
-          echo "CANDIDATE_TAG=$(grep '^version' Cargo.toml | awk '{print $3}' | sed -r 's/\"//g')-dev+$(date +%y%m%d)" >> $GITHUB_ENV
-          echo "**`$CANDIDATE_TAG`**: ${{ env.CANDIDATE_TAG }}" >> $GITHUB_STEP_SUMMARY
-          echo "NEEDED_PART=$(git show-ref --tags -d | grep ${{ env.CANDIDATE_TAG }} | wc -l)" >> $GITHUB_ENV
-          echo "**`$NEEDED_PART`**: ${{ env.NEEDED_PART }}" >> $GITHUB_STEP_SUMMARY
-          if [ ${{ env.NEEDED_PART }} -eq 0 ] ; then
-            echo "::set-output name=tag-name::${{ env.CANDIDATE_TAG }}"
-            echo "Using tag name `${{ env.CANDIDATE_TAG }}`" >> $GITHUB_STEP_SUMMARY
+          candidate-tag=$(grep '^version' Cargo.toml | awk '{print $3}' | sed -r 's/\"//g')-dev+$(date +%y%m%d)
+          echo "**`$CANDIDATE_TAG`**: $candidate-tag" >> $GITHUB_STEP_SUMMARY
+          needed-part=$(git show-ref --tags -d | grep $candidate-tag | wc -l)
+          echo "**`$NEEDED_PART`**: $needed-part" >> $GITHUB_STEP_SUMMARY
+          if [ $needed-part -eq 0 ] ; then
+            echo "::set-output name=tag-name::$candidate-tag"
+            echo "Using tag name `$candidate-tag`" >> $GITHUB_STEP_SUMMARY
           else
-            echo "::set-output name=tag-name::${{ env.CANDIDATE_TAG }}.${{ env.NEEDED_PART }}"
-            echo "Using tag name `${{ env.CANDIDATE_TAG }}.${{ env.NEEDED_PART }}`" >> $GITHUB_STEP_SUMMARY
+            echo "::set-output name=tag-name::$candidate-tag.$needed-part"
+            echo "Using tag name `$candidate-tag.$needed-part`" >> $GITHUB_STEP_SUMMARY
           fi
         
       - name: tag a release
