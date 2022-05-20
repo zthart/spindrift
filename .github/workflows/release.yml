@@ -8,10 +8,13 @@ jobs:
     outputs:
       tag: ${{ steps.generate-tag.outputs.tag-name }}
     steps:
-      - name: Checkout Spindrift
+      - name: Checkout spindrift
         uses: actions/checkout@v3
+        
+      - name: Unshallow repository
+        run: git fetch --prune --unshallow
 
-      - name: Generate Tag
+      - name: Generate tag name
         id: generate-tag
         shell: bash
         run: |
@@ -23,7 +26,7 @@ jobs:
           echo "::group::Existing tags"
           echo "$(git show-ref --tags -d)"
           echo "::endgroup::"
-          NEEDED_PART="$(git show-ref --tags -d | grep $CANDIDATE_TAG | wc -l)"
+          NEEDED_PART="$(git describe --tags | grep $CANDIDATE_TAG | wc -l)"
           set -o pipefail
           echo "**\`\$NEEDED_PART\`**: $NEEDED_PART" >> $GITHUB_STEP_SUMMARY
           if [ $NEEDED_PART -eq 0 ] ; then
