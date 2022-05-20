@@ -24,9 +24,9 @@ jobs:
           echo "Disabling pipefail"
           set +o pipefail
           echo "::group::Existing tags"
-          echo "$(git describe --tags)"
+          echo "$(git show-ref --tags -d)"
           echo "::endgroup::"
-          NEEDED_PART="$(git describe --tags | grep $CANDIDATE_TAG | wc -l)"
+          NEEDED_PART="$(git show-ref --tags -d | grep $CANDIDATE_TAG | wc -l)"
           set -o pipefail
           echo "Re-enabled pipefail"
           echo "**\`\$NEEDED_PART\`**: $NEEDED_PART" >> $GITHUB_STEP_SUMMARY
