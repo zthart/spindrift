@@ -15,6 +15,7 @@ jobs:
         id: generate-tag
         shell: bash
         run: |
+          set -x
           echo "## Creating Tag" >> $GITHUB_STEP_SUMMARY
           CANDIDATE_TAG="$(grep '^version' Cargo.toml | awk '{print $3}' | sed -r 's/\"//g')-dev+$(date +%y%m%d)"
           echo "**\`\$CANDIDATE_TAG\`**: $CANDIDATE_TAG" >> $GITHUB_STEP_SUMMARY
