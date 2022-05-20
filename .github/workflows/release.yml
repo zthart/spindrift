@@ -15,9 +15,9 @@ jobs:
         id: generate-tag
         run: |
           echo "## Creating Tag" >> $GITHUB_STEP_SUMMARY
-          candidate-tag=$(grep '^version' Cargo.toml | awk '{print $3}' | sed -r 's/\"//g')-dev+$(date +%y%m%d)
+          candidate-tag=`$(grep '^version' Cargo.toml | awk '{print $3}' | sed -r 's/\"//g')-dev+$(date +%y%m%d)`
           echo "**`$CANDIDATE_TAG`**: $candidate-tag" >> $GITHUB_STEP_SUMMARY
-          needed-part=$(git show-ref --tags -d | grep $candidate-tag | wc -l)
+          needed-part=`$(git show-ref --tags -d | grep $candidate-tag | wc -l)`
           echo "**`$NEEDED_PART`**: $needed-part" >> $GITHUB_STEP_SUMMARY
           if [ $needed-part -eq 0 ] ; then
             echo "::set-output name=tag-name::$candidate-tag"
