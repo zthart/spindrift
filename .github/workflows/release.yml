@@ -13,18 +13,19 @@ jobs:
 
       - name: generate tag
         id: generate-tag
+        shell: bash
         run: |
           echo "## Creating Tag" >> $GITHUB_STEP_SUMMARY
-          candidate-tag=`$(grep '^version' Cargo.toml | awk '{print $3}' | sed -r 's/\"//g')-dev+$(date +%y%m%d)`
-          echo "**`$CANDIDATE_TAG`**: $candidate-tag" >> $GITHUB_STEP_SUMMARY
-          needed-part=`$(git show-ref --tags -d | grep $candidate-tag | wc -l)`
-          echo "**`$NEEDED_PART`**: $needed-part" >> $GITHUB_STEP_SUMMARY
-          if [ $needed-part -eq 0 ] ; then
-            echo "::set-output name=tag-name::$candidate-tag"
-            echo "Using tag name `$candidate-tag`" >> $GITHUB_STEP_SUMMARY
+          CANDIDATE_TAG=`$(grep '^version' Cargo.toml | awk '{print $3}' | sed -r 's/\"//g')-dev+$(date +%y%m%d)`
+          echo "**`\$CANDIDATE_TAG`**: $CANDIDATE_TAG" >> $GITHUB_STEP_SUMMARY
+          NEEDED_PART=`$(git show-ref --tags -d | grep $CANDIDATE_TAG | wc -l)`
+          echo "**`\$NEEDED_PART`**: $NEEDED_PART" >> $GITHUB_STEP_SUMMARY
+          if [ $NEEDED_PART -eq 0 ] ; then
+            echo "::set-output name=tag-name::$CANDIDATE_TAG"
+            echo "Using tag name `$CANDIDATE_TAG`" >> $GITHUB_STEP_SUMMARY
           else
-            echo "::set-output name=tag-name::$candidate-tag.$needed-part"
-            echo "Using tag name `$candidate-tag.$needed-part`" >> $GITHUB_STEP_SUMMARY
+            echo "::set-output name=tag-name::$CANDIDATE_TAG.$NEEDED_PART"
+            echo "Using tag name `$CANDIDATE_TAG.$NEEDED_PART`" >> $GITHUB_STEP_SUMMARY
           fi
         
       - name: tag a release
