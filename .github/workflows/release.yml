@@ -11,7 +11,7 @@ jobs:
       - name: Checkout Spindrift
         uses: actions/checkout@v3
 
-      - name: generate tag
+      - name: Generate Tag
         id: generate-tag
         shell: bash
         run: |
@@ -19,8 +19,6 @@ jobs:
           echo "## Creating Tag" >> $GITHUB_STEP_SUMMARY
           CANDIDATE_TAG="$(grep '^version' Cargo.toml | awk '{print $3}' | sed -r 's/\"//g')-dev+$(date +%y%m%d)"
           echo "**\`\$CANDIDATE_TAG\`**: $CANDIDATE_TAG" >> $GITHUB_STEP_SUMMARY
-          TEST_VAR="0"
-          echo "**\`\$TEST_VAR\`**: $TEST_VAR" >> $GITHUB_STEP_SUMMARY
           set +o pipefail
           NEEDED_PART="$(git show-ref --tags -d | grep $CANDIDATE_TAG | wc -l)"
           set -o pipefail
@@ -33,8 +31,37 @@ jobs:
             echo "Using tag name \`$CANDIDATE_TAG.$NEEDED_PART\`" >> $GITHUB_STEP_SUMMARY
           fi
         
-      - name: tag a release
+      - name: Create tag and push
         run: |
           git tag ${{ steps.generate-tag.outputs.tag-name }}
           git push origin tag ${{ steps.generate-tag.outputs.tag-name }}
+  cut-release:
+    runs-on: ubuntu-latest
+    needs: make-tag
+    steps:
+      - name: Checkout spindrift
+        uses: actions/checkout@v3
+        
+      - name: Setup rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
 
+      - name: Build spindrift
+        run: |
+          echo "## Buidling Binary" >> $GITHUB_STEP_SUMMARY
+          echo "Build started at \`$(date)\`" >> $GITHUB_STEP_SUMMARY
+          cargo build --release
+          echo "Build finished at \`$(date)\`" >> $GITHUB_STEP_SUMMARY
+        
+      - name: Cut release and upload artifacts
+        id: cut-release
+        uses: softprops/action-gh-release@v1
+        with: 
+          files: "target/release/spindrift"
+          prerelease: true
+          tag_name: ${{ needs.make-tag.outputs.tag-name }}
+          fail_on_unmatched_files: true
+          
+      - run: |
+          echo "Created a release: ${{ steps.cut-release.outputs.url }}" >> $GITHUB_STEP_SUMMARY
