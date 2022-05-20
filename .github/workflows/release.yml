@@ -15,7 +15,9 @@ jobs:
         id: generate-tag
         run: |
           echo "CANDIDATE_TAG=$(grep '^version' Cargo.toml | awk '{print $3}' | sed -r 's/\"//g')-dev+$(date +%y%m%d)" >> $GITHUB_ENV
+          echo "Have candidate tag: ${CANDIDATE_TAG}"
           echo "NEEDED_PART=$(git show-ref --tags -d | grep ${CANDIDATE_TAG} | wc -l)" >> $GITHUB_ENV
+          echo "Have needed part: ${NEEDED_PART}"
           if [ ${NEEDED_PART} -eq 0 ] ; then
             echo "::set-output name=tag-name::${CANDIDATE_TAG}"
           else
