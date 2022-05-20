@@ -18,16 +18,17 @@ jobs:
         id: generate-tag
         shell: bash
         run: |
-          set -x
           echo "## Creating Tag" >> $GITHUB_STEP_SUMMARY
           CANDIDATE_TAG="$(grep '^version' Cargo.toml | awk '{print $3}' | sed -r 's/\"//g')-dev+$(date +%y%m%d)"
           echo "**\`\$CANDIDATE_TAG\`**: $CANDIDATE_TAG" >> $GITHUB_STEP_SUMMARY
+          echo "Disabling pipefail"
           set +o pipefail
           echo "::group::Existing tags"
-          echo "$(git show-ref --tags -d)"
+          echo "$(git describe --tags)"
           echo "::endgroup::"
           NEEDED_PART="$(git describe --tags | grep $CANDIDATE_TAG | wc -l)"
           set -o pipefail
+          echo "Re-enabled pipefail"
           echo "**\`\$NEEDED_PART\`**: $NEEDED_PART" >> $GITHUB_STEP_SUMMARY
           if [ $NEEDED_PART -eq 0 ] ; then
             echo "::set-output name=tag-name::$CANDIDATE_TAG"
@@ -55,7 +56,7 @@ jobs:
 
       - name: Build spindrift
         run: |
-          echo "## Buidling Binary" >> $GITHUB_STEP_SUMMARY
+          echo "## Building Binary" >> $GITHUB_STEP_SUMMARY
           echo "Build started at \`$(date)\`" >> $GITHUB_STEP_SUMMARY
           cargo build --release
           echo "Build finished at \`$(date)\`" >> $GITHUB_STEP_SUMMARY
@@ -66,8 +67,9 @@ jobs:
         with: 
           files: "target/release/spindrift"
           prerelease: true
-          tag_name: ${{ needs.make-tag.outputs.tag-name }}
+          tag_name: ${{ needs.make-tag.outputs.tag }}
           fail_on_unmatched_files: true
           
-      - run: |
+      - name: Post release summary
+        run: |
           echo "Created a release: ${{ steps.cut-release.outputs.url }}" >> $GITHUB_STEP_SUMMARY
