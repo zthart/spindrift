@@ -21,7 +21,9 @@ jobs:
           echo "**\`\$CANDIDATE_TAG\`**: $CANDIDATE_TAG" >> $GITHUB_STEP_SUMMARY
           TEST_VAR="0"
           echo "**\`\$TEST_VAR\`**: $TEST_VAR" >> $GITHUB_STEP_SUMMARY
+          set +o pipefail
           NEEDED_PART="$(git show-ref --tags -d | grep $CANDIDATE_TAG | wc -l)"
+          set -o pipefail
           echo "**\`\$NEEDED_PART\`**: $NEEDED_PART" >> $GITHUB_STEP_SUMMARY
           if [ $NEEDED_PART -eq 0 ] ; then
             echo "::set-output name=tag-name::$CANDIDATE_TAG"
