@@ -23,10 +23,10 @@ jobs:
           echo "**\`\$NEEDED_PART\`**: $NEEDED_PART" >> $GITHUB_STEP_SUMMARY
           if [ $NEEDED_PART -eq 0 ] ; then
             echo "::set-output name=tag-name::$CANDIDATE_TAG"
-            echo "Using tag name `$CANDIDATE_TAG`" >> $GITHUB_STEP_SUMMARY
+            echo "Using tag name \`$CANDIDATE_TAG\`" >> $GITHUB_STEP_SUMMARY
           else
             echo "::set-output name=tag-name::$CANDIDATE_TAG.$NEEDED_PART"
-            echo "Using tag name `$CANDIDATE_TAG.$NEEDED_PART`" >> $GITHUB_STEP_SUMMARY
+            echo "Using tag name \`$CANDIDATE_TAG.$NEEDED_PART\`" >> $GITHUB_STEP_SUMMARY
           fi
         
       - name: tag a release
