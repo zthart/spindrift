@@ -1,5 +1,7 @@
 # Spindrift
 
+[![Dev Release](https://github.com/zthart/spindrift/actions/workflows/release.yml/badge.svg)](https://github.com/zthart/spindrift/actions/workflows/release.yml)
+
 A really really simple static site generator focused on short posts (droplets) that feature an optional image and text-based content.
 
 ## Usage

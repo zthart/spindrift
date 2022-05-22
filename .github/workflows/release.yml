@@ -1,4 +1,4 @@
-name: Tag a dev release on GitHub using the current version according to Cargo.toml
+name: Dev Release
 on:
   push:
     branches: [ main ]
