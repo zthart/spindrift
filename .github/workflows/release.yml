@@ -6,7 +6,7 @@ jobs:
   check-files:
     runs-on: ubuntu-latest
     outputs:
-      matched-files: ${{ steps.check-files.output.matched-files }}
+      matched-files: ${{ steps.check-files.outputs.matched-files }}
     steps:
       - name: Checkout spindrift
         uses: actions/checkout@v3
@@ -17,7 +17,7 @@ jobs:
       - name: Check files
         id: check-files
         run: |
-          echo "## Checking commit changes"
+          echo "## Checking commit changes" >> $GITHUB_STEP_SUMMARY
           echo "::group::Show changed files"
           echo "$(git log HEAD^1..HEAD --raw --no-decorate --name-only --pretty=oneline | tail -n +2)"
           echo "::endgroup::"
