@@ -156,6 +156,7 @@ impl Droplet {
                         .replace_all(&builder, "<code>$inline_pre</code>")
                         .to_owned()
                         .to_string();
+                    // Could probably do this up with the other entity escaping, but it also probably doesn't matter
                     ESCAPED_SINGLE_BACKTICK_REGEX
                         .replace_all(&builder, "`")
                         .to_owned()
