@@ -19,7 +19,9 @@ jobs:
         run: echo "::set-output name=matched-files::$(git log HEAD^1..HEAD --raw --no-decorate --name-only --pretty=oneline | tail -n +2 | sed -n '/^src/p' | wc -l)"
 
   make-tag:
+    needs: check-files
     runs-on: ubuntu-latest
+    if: ${{ needs.check-files.outputs.matched-files != '0' }}
     outputs:
       tag: ${{ steps.generate-tag.outputs.tag-name }}
     steps:
@@ -59,8 +61,7 @@ jobs:
           git push origin tag ${{ steps.generate-tag.outputs.tag-name }}
   cut-release:
     runs-on: ubuntu-latest
-    needs: [make-tag, check-files]
-    if: ${{ needs.check-files.outputs.matched-files != '0' }}
+    needs: make-tag
     steps:
       - name: Checkout spindrift
         uses: actions/checkout@v3
