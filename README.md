@@ -86,3 +86,11 @@ In the future, an `spindrift.html` template will be used to render the post inde
 - [x] Markdown support in text content
 - [ ] S3 or other storage backends for images
 - [ ] Basic themeing framework for custom css
+
+## License
+
+This project is licensed under the GPL v3, the text of which can be found in the LICENSE file at the root of this repository. 
+A plain-text version of this document can be found on the web [here](https://www.gnu.org/licenses/gpl-3.0.txt).
+A copy of this license must be distributed with this application, and source code must be made available for any derivative works.
+
+This project relies on code licensed under the [MIT License](https://opensource.org/licenses/MIT), which is GPL-compatible. 
