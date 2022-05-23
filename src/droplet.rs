@@ -1,7 +1,7 @@
 use anyhow::Error;
 use chrono::NaiveDate;
+use fancy_regex::Regex;
 use lazy_static::lazy_static;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tera::Context;
 
@@ -14,12 +14,22 @@ use crate::errors;
 const EM_REGEX_STR: &str = r"_(?P<em_text>.*?)_";
 const STRONG_REGEX_STR: &str = r"\*\*(?P<strong_text>.*?)\*\*";
 const A_REGEX_STR: &str = r"\[(?P<a_text>.*?)\]\((?P<a_href>.*?)\)";
+const CODE_INLINE_REGEX_STR: &str = r"(?<!\\)\`{1,}(?P<inline_pre>.+?)(?<!`)(?<!\\)\`{1,}(?!`)";
+const ESCAPED_SINGLE_BACKTICK_REGEX_STR: &str = r"\\`";
+const LT_REGEX_STR: &str = r"\<";
+const GT_REGEX_STR: &str = r"\>";
+const AMP_REGEX_STR: &str = r"\&";
 
 lazy_static! {
     // Unwrap these with certainty since the expressions themselves are constants and should compile just fine
     static ref EM_REGEX: Regex = Regex::new(EM_REGEX_STR).unwrap();
     static ref STRONG_REGEX: Regex = Regex::new(STRONG_REGEX_STR).unwrap();
     static ref A_REGEX: Regex = Regex::new(A_REGEX_STR).unwrap();
+    static ref CODE_INLINE_REGEX: Regex = Regex::new(CODE_INLINE_REGEX_STR).unwrap();
+    static ref ESCAPED_SINGLE_BACKTICK_REGEX: Regex = Regex::new(ESCAPED_SINGLE_BACKTICK_REGEX_STR).unwrap();
+    static ref LT_REGEX: Regex = Regex::new(LT_REGEX_STR).unwrap();
+    static ref GT_REGEX: Regex = Regex::new(GT_REGEX_STR).unwrap();
+    static ref AMP_REGEX: Regex = Regex::new(AMP_REGEX_STR).unwrap();
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -117,16 +127,37 @@ impl Droplet {
                 .trim()
                 .split('\n')
                 .map(|v| {
-                    let mut builder = EM_REGEX
-                        .replace_all(v, "<em>$em_text</em>")
+                    // Do this first, otherwise the rest of the escaped entites get double escaped
+                    let mut builder = AMP_REGEX 
+                        .replace_all(v, "&amp;")
+                        .to_owned()
+                        .to_string();
+                    builder = GT_REGEX
+                        .replace_all(&builder, "&gt;")
+                        .to_owned()
+                        .to_string();
+                    builder = LT_REGEX
+                        .replace_all(&builder, "&lt;")
+                        .to_owned()
+                        .to_string();
+                    builder = EM_REGEX
+                        .replace_all(&builder, "<em>$em_text</em>")
                         .to_owned()
                         .to_string();
                     builder = STRONG_REGEX
                         .replace_all(&builder, "<strong>$strong_text</strong>")
                         .to_owned()
                         .to_string();
-                    A_REGEX
+                    builder = A_REGEX
                         .replace_all(&builder, "<a href=\"$a_href\">$a_text</a>")
+                        .to_owned()
+                        .to_string();
+                    builder = CODE_INLINE_REGEX
+                        .replace_all(&builder, "<code>$inline_pre</code>")
+                        .to_owned()
+                        .to_string();
+                    ESCAPED_SINGLE_BACKTICK_REGEX
+                        .replace_all(&builder, "`")
                         .to_owned()
                         .to_string()
                 })
