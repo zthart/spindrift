@@ -16,7 +16,18 @@ jobs:
 
       - name: Check files
         id: check-files
-        run: echo "::set-output name=matched-files::$(git log HEAD^1..HEAD --raw --no-decorate --name-only --pretty=oneline | tail -n +2 | sed -n '/^src/p' | wc -l)"
+        run: |
+          echo "## Checking commit changes"
+          echo "::group::Show changed files"
+          echo "$(git log HEAD^1..HEAD --raw --no-decorate --name-only --pretty=oneline | tail -n +2)"
+          echo "::endgroup::"
+          MATCHED_FILES=$(git log HEAD^1..HEAD --raw --no-decorate --name-only --pretty=oneline | tail -n +2 | sed -n '/^src/p' | wc -l)
+          echo "::set-output name=matched-files::${MATCHED_FILES}"
+          if [ ${MATCHED_FILES} -eq 0 ] ; then
+            echo "No changes to \`src\` dir detected, not cutting release" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Detected ${MATCHED_FILES} changed \`src\` files, generating tag" >> $GITHUB_STEP_SUMMARY
+          fi
 
   make-tag:
     needs: check-files
