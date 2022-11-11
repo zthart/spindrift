@@ -15,7 +15,7 @@ const EM_REGEX_STR: &str = r"_(?P<em_text>.*?)_";
 const STRONG_REGEX_STR: &str = r"\*\*(?P<strong_text>.*?)\*\*";
 const A_REGEX_STR: &str = r"\[(?P<a_text>.*?)\]\((?P<a_href>.*?)\)";
 const CODE_INLINE_REGEX_STR: &str = r"(?<!\\)\`{1,}(?P<inline_pre>.+?)(?<!`)(?<!\\)\`{1,}(?!`)";
-const ESCAPED_SINGLE_BACKTICK_REGEX_STR: &str = r"\\`";
+const ESCAPED_SINGLE_BACKTICK_REGEX_STR: &str = r"\\\`";
 const LT_REGEX_STR: &str = r"\<";
 const GT_REGEX_STR: &str = r"\>";
 const AMP_REGEX_STR: &str = r"\&";
@@ -140,6 +140,10 @@ impl Droplet {
                         .replace_all(&builder, "&lt;")
                         .to_owned()
                         .to_string();
+                    builder = ESCAPED_SINGLE_BACKTICK_REGEX
+                        .replace_all(&builder, "&grave;")
+                        .to_owned()
+                        .to_string();
                     builder = EM_REGEX
                         .replace_all(&builder, "<em>$em_text</em>")
                         .to_owned()
@@ -152,13 +156,8 @@ impl Droplet {
                         .replace_all(&builder, "<a href=\"$a_href\">$a_text</a>")
                         .to_owned()
                         .to_string();
-                    builder = CODE_INLINE_REGEX
+                    CODE_INLINE_REGEX
                         .replace_all(&builder, "<code>$inline_pre</code>")
-                        .to_owned()
-                        .to_string();
-                    // Could probably do this up with the other entity escaping, but it also probably doesn't matter
-                    ESCAPED_SINGLE_BACKTICK_REGEX
-                        .replace_all(&builder, "`")
                         .to_owned()
                         .to_string()
                 })
