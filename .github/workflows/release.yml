@@ -1,7 +1,7 @@
 name: Dev Release
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 jobs:
   check-files:
     runs-on: ubuntu-latest
@@ -22,7 +22,7 @@ jobs:
           echo "$(git log HEAD^1..HEAD --raw --no-decorate --name-only --pretty=oneline | tail -n +2)"
           echo "::endgroup::"
           MATCHED_FILES=$(git log HEAD^1..HEAD --raw --no-decorate --name-only --pretty=oneline | tail -n +2 | sed -n '/^src/p' | wc -l)
-          echo "::set-output name=matched-files::${MATCHED_FILES}"
+          echo "matched-files=${MATCHED_FILES}" >> $GITHUB_OUTPUT
           if [ ${MATCHED_FILES} -eq 0 ] ; then
             echo "No changes to \`src\` dir detected, not cutting release" >> $GITHUB_STEP_SUMMARY
           else
@@ -38,7 +38,7 @@ jobs:
     steps:
       - name: Checkout spindrift
         uses: actions/checkout@v3
-        
+
       - name: Unshallow repository
         run: git fetch --prune --unshallow
 
@@ -59,13 +59,13 @@ jobs:
           echo "Re-enabled pipefail"
           echo "**\`\$NEEDED_PART\`**: $NEEDED_PART" >> $GITHUB_STEP_SUMMARY
           if [ $NEEDED_PART -eq 0 ] ; then
-            echo "::set-output name=tag-name::$CANDIDATE_TAG"
+            echo "tag-name=$CANDIDATE_TAG" >> $GITHUB_OUTPUT
             echo "Using tag name \`$CANDIDATE_TAG\`" >> $GITHUB_STEP_SUMMARY
           else
-            echo "::set-output name=tag-name::$CANDIDATE_TAG.$NEEDED_PART"
+            echo "tag-name::$CANDIDATE_TAG.$NEEDED_PART" >> $GITHUB_OUTPUT
             echo "Using tag name \`$CANDIDATE_TAG.$NEEDED_PART\`" >> $GITHUB_STEP_SUMMARY
           fi
-        
+
       - name: Create tag and push
         run: |
           git tag ${{ steps.generate-tag.outputs.tag-name }}
@@ -76,7 +76,7 @@ jobs:
     steps:
       - name: Checkout spindrift
         uses: actions/checkout@v3
-        
+
       - name: Setup rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -88,16 +88,16 @@ jobs:
           echo "Build started at \`$(date)\`" >> $GITHUB_STEP_SUMMARY
           cargo build --release
           echo "Build finished at \`$(date)\`" >> $GITHUB_STEP_SUMMARY
-        
+
       - name: Cut release and upload artifacts
         id: cut-release
         uses: softprops/action-gh-release@v1
-        with: 
+        with:
           files: "target/release/spindrift"
           prerelease: true
           tag_name: ${{ needs.make-tag.outputs.tag }}
           fail_on_unmatched_files: true
-          
+
       - name: Post release summary
         run: |
           echo "Created a release: ${{ steps.cut-release.outputs.url }}" >> $GITHUB_STEP_SUMMARY
